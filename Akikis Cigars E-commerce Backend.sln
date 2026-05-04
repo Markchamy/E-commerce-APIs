@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34330.188
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Akikis Cigars E-commerce Backend", "Backend\Akikis Cigars E-commerce Backend.csproj", "{DD0BDDFA-C4E4-4EA6-A205-8A9E801D4902}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{DD0BDDFA-C4E4-4EA6-A205-8A9E801D4902}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DD0BDDFA-C4E4-4EA6-A205-8A9E801D4902}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DD0BDDFA-C4E4-4EA6-A205-8A9E801D4902}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DD0BDDFA-C4E4-4EA6-A205-8A9E801D4902}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {D0BF3C3A-2B59-42FE-91E7-1BABFFC67DE7}
+	EndGlobalSection
+EndGlobal
