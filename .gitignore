@@ -1,0 +1,96 @@
+## .NET Core
+bin/
+obj/
+publish/
+publish-*/
+*.dll
+*.exe
+*.pdb
+
+## Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## Visual Studio
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+## Sensitive Files - NEVER COMMIT THESE!
+*.pem
+*.key
+*.pfx
+*.p12
+appsettings.Production.json
+appsettings.Development.json
+.env
+.env.*
+secrets.json
+
+## Database
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+## Uploads (if you want to exclude uploaded files)
+# Uncomment if you don't want to track uploaded images in Git
+# wwwroot/uploads/**
+# !wwwroot/uploads/.gitkeep
+
+## OS Files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+## Rider
+.idea/
+*.sln.iml
+
+## Backup files
+*.bak
+*.tmp
+*.temp
+*~
+
+## NuGet
+*.nupkg
+*.snupkg
+packages/
+.nuget/
+
+## Test Results
+TestResults/
+[Tt]est[Rr]esult*/
+
+## Others
+*.log
+*.cache
+*.suo
+*.user
+node_modules/
+
+*.md
