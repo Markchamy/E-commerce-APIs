@@ -6,11 +6,25 @@ namespace Backend.Data
 {
     public class MyDbContext : DbContext
     {
+        private readonly ITenantContext? _tenantContext;
+
         public MyDbContext()
         {
         }
 
         public MyDbContext(DbContextOptions<MyDbContext> options) : base(options) { }
+
+        public MyDbContext(DbContextOptions<MyDbContext> options, ITenantContext tenantContext) : base(options)
+        {
+            _tenantContext = tenantContext;
+        }
+
+        /// <summary>
+        /// Re-evaluated by EF Core on every query against an IStoreScoped entity.
+        /// Returning null disables filtering (used for unauthenticated routes
+        /// and design-time tools).
+        /// </summary>
+        public int? CurrentStoreId => _tenantContext?.StoreId;
 
         public DbSet<StoreModel> Stores { get; set; }
         public DbSet<UserModel> Users { get; set; }
@@ -653,7 +667,7 @@ namespace Backend.Data
             ConfigureStoreScope<PmiProduct>(modelBuilder, "IX_pmiproducts_store_id");
         }
 
-        private static void ConfigureStoreScope<TEntity>(ModelBuilder modelBuilder, string indexName)
+        private void ConfigureStoreScope<TEntity>(ModelBuilder modelBuilder, string indexName)
             where TEntity : class, IStoreScoped
         {
             modelBuilder.Entity<TEntity>()
@@ -665,6 +679,48 @@ namespace Backend.Data
             modelBuilder.Entity<TEntity>()
                 .HasIndex(e => e.StoreId)
                 .HasDatabaseName(indexName);
+
+            // Auto-scope every read against this entity to the current tenant.
+            // CurrentStoreId == null disables the filter for unauthenticated routes
+            // and design-time tools, preserving legacy behavior where applicable.
+            modelBuilder.Entity<TEntity>()
+                .HasQueryFilter(e => CurrentStoreId == null || e.StoreId == CurrentStoreId);
+        }
+
+        public override int SaveChanges() => SaveChanges(acceptAllChangesOnSuccess: true);
+
+        public override int SaveChanges(bool acceptAllChangesOnSuccess)
+        {
+            ApplyTenantOnInsert();
+            return base.SaveChanges(acceptAllChangesOnSuccess);
+        }
+
+        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+            => SaveChangesAsync(acceptAllChangesOnSuccess: true, cancellationToken);
+
+        public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+        {
+            ApplyTenantOnInsert();
+            return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+
+        /// <summary>
+        /// For every IStoreScoped entity being inserted with an unset StoreId (0),
+        /// stamp it with the current tenant. Callers that pass an explicit StoreId
+        /// keep that value (used by admin tools that operate across stores).
+        /// </summary>
+        private void ApplyTenantOnInsert()
+        {
+            var storeId = CurrentStoreId;
+            if (storeId is null) return;
+
+            foreach (var entry in ChangeTracker.Entries<IStoreScoped>())
+            {
+                if (entry.State == EntityState.Added && entry.Entity.StoreId <= 0)
+                {
+                    entry.Entity.StoreId = storeId.Value;
+                }
+            }
         }
 
     }
