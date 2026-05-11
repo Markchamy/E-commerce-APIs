@@ -80,8 +80,8 @@ builder.Services.AddScoped<IVariantAdjustmentService, VariantAdjustmentServiceRe
 // Multi-tenancy: per-request context populated by TenantMiddleware below.
 builder.Services.AddScoped<ITenantContext, TenantContext>();
 
-// Local JWT issuance (replaces Cognito-issued tokens). Validation is still
-// wired against Cognito below; that swap happens in a follow-up commit.
+// Local JWT issuance. Tokens carry a store_id claim which TenantMiddleware
+// reads on subsequent requests.
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 
@@ -106,7 +106,6 @@ builder.Services.AddCors(options =>
 });
 
 // JWT validation against locally-issued tokens (signed by JwtTokenService).
-// Replaces the previous Cognito-backed JwtBearer configuration.
 var jwtSection = builder.Configuration.GetSection(JwtOptions.SectionName);
 var jwtKey = jwtSection["Key"];
 if (string.IsNullOrWhiteSpace(jwtKey) || jwtKey.Length < 32)

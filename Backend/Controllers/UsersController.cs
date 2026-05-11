@@ -15,8 +15,6 @@ using System.Diagnostics.Metrics;
 using System.Text;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
-using Amazon.CognitoIdentityProvider;
-using Amazon.CognitoIdentityProvider.Model;
 
 
 namespace Backend.Controllers
@@ -1462,12 +1460,9 @@ namespace Backend.Controllers
             }
 
             bool databaseUpdated = false;
-            bool cognitoUpdated = false;
-            string errorMessage = "";
 
             try
             {
-                // Step 1: Update password in database
                 var response = await _userRepository.GetUserByEmail(dto.Email);
                 if (!response.IsSuccess)
                 {
@@ -1476,61 +1471,17 @@ namespace Backend.Controllers
 
                 var user = (UserModel)response.Data;
 
-                // Hash and update the new password in database
                 user.password = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
                 await _userRepository.UpdateUser(user);
                 databaseUpdated = true;
 
                 Console.WriteLine($"[SUCCESS] Database password updated for: {dto.Email}");
 
-                // Step 2: Update password in Cognito
-                try
-                {
-                    var region = Amazon.RegionEndpoint.GetBySystemName(_configuration["AWS:Region"]);
-
-                    // Create Cognito client with explicit credentials from appsettings
-                    var accessKey = _configuration["AWS:AccessKeyId"];
-                    var secretKey = _configuration["AWS:SecretAccessKey"];
-
-                    var credentials = new Amazon.Runtime.BasicAWSCredentials(accessKey, secretKey);
-                    var cognitoClient = new AmazonCognitoIdentityProviderClient(credentials, region);
-
-                    var userPoolId = _configuration["AWS:Cognito:UserPoolId"];
-
-                    // Set permanent password in Cognito (admin operation)
-                    var setPasswordRequest = new AdminSetUserPasswordRequest
-                    {
-                        UserPoolId = userPoolId,
-                        Username = dto.Email,
-                        Password = dto.NewPassword,
-                        Permanent = true // Make it permanent, not temporary
-                    };
-
-                    await cognitoClient.AdminSetUserPasswordAsync(setPasswordRequest);
-                    cognitoUpdated = true;
-
-                    Console.WriteLine($"[SUCCESS] Cognito password updated for: {dto.Email}");
-                }
-                catch (UserNotFoundException)
-                {
-                    errorMessage = "User not found in Cognito. Database password updated successfully.";
-                    Console.WriteLine($"[WARNING] User not found in Cognito: {dto.Email}");
-                }
-                catch (Exception cognitoEx)
-                {
-                    errorMessage = $"Database updated but Cognito update failed: {cognitoEx.Message}";
-                    Console.WriteLine($"[ERROR] Cognito update failed: {cognitoEx.Message}");
-                }
-
-                // Return response
                 return Ok(new ForceChangePasswordResponseDTO
                 {
                     IsSuccess = true,
-                    Message = string.IsNullOrEmpty(errorMessage)
-                        ? "Password changed successfully in both database and Cognito."
-                        : errorMessage,
-                    DatabaseUpdated = databaseUpdated,
-                    CognitoUpdated = cognitoUpdated
+                    Message = "Password changed successfully.",
+                    DatabaseUpdated = databaseUpdated
                 });
             }
             catch (Exception ex)
@@ -1540,8 +1491,7 @@ namespace Backend.Controllers
                 {
                     IsSuccess = false,
                     Message = $"Internal server error: {ex.Message}",
-                    DatabaseUpdated = databaseUpdated,
-                    CognitoUpdated = cognitoUpdated
+                    DatabaseUpdated = databaseUpdated
                 });
             }
         }
