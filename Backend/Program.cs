@@ -105,6 +105,13 @@ builder.Services.AddCors(options =>
                       });
 });
 
+// JWT validation against locally-issued tokens (signed by JwtTokenService).
+// Replaces the previous Cognito-backed JwtBearer configuration.
+var jwtSection = builder.Configuration.GetSection(JwtOptions.SectionName);
+var jwtKey = jwtSection["Key"];
+if (string.IsNullOrWhiteSpace(jwtKey) || jwtKey.Length < 32)
+    throw new InvalidOperationException("Jwt:Key must be configured and at least 32 characters long.");
+
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -112,17 +119,18 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    options.Authority = "https://cognito-idp.eu-north-1.amazonaws.com/eu-north-1_ZtzhnBriZ";
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true,
-        ValidIssuer = "https://cognito-idp.eu-north-1.amazonaws.com/eu-north-1_ZtzhnBriZ", // Cognito domain URL
+        ValidIssuer = jwtSection["Issuer"],
         ValidateAudience = true,
-        ValidAudience = "1i2j03gs7virgvb8gdjeig3esl", // Cognito App Client ID
+        ValidAudience = jwtSection["Audience"],
         ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(jwtKey)),
+        ClockSkew = TimeSpan.FromMinutes(2)
     };
 
-    // Add logging for token validation events
     options.Events = new JwtBearerEvents
     {
         OnAuthenticationFailed = context =>
