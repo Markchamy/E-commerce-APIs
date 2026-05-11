@@ -1,8 +1,10 @@
 using Backend.Data;
 using Backend.Hubs;
 using Backend.Interfaces;
+using Backend.Middleware;
 using Backend.Models;
 using Backend.Repositories;
+using Backend.Tenancy;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
@@ -73,6 +75,9 @@ builder.Services.AddScoped<ICommentServices, CommentServicesRepository>();
 builder.Services.AddScoped<ITimelineServices, TimelineServicesRepository>();
 builder.Services.AddScoped<ISearchServices, SearchServicesRepository>();
 builder.Services.AddScoped<IVariantAdjustmentService, VariantAdjustmentServiceRepository>();
+
+// Multi-tenancy: per-request context populated by TenantMiddleware below.
+builder.Services.AddScoped<ITenantContext, TenantContext>();
 
 builder.Services.AddSignalR();
 
@@ -180,6 +185,11 @@ app.UseWebSockets();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Multi-tenancy: resolves the current store from X-Store-Id header or JWT
+// "store_id" claim, populating the scoped ITenantContext. Must run AFTER
+// UseAuthentication so claims are available.
+app.UseMiddleware<TenantMiddleware>();
 
 app.MapControllers();
 app.MapHub<OrderHub>("/hubs/orders");
