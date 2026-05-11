@@ -1,3 +1,4 @@
+using Backend.Auth;
 using Backend.Data;
 using Backend.Hubs;
 using Backend.Interfaces;
@@ -78,6 +79,11 @@ builder.Services.AddScoped<IVariantAdjustmentService, VariantAdjustmentServiceRe
 
 // Multi-tenancy: per-request context populated by TenantMiddleware below.
 builder.Services.AddScoped<ITenantContext, TenantContext>();
+
+// Local JWT issuance (replaces Cognito-issued tokens). Validation is still
+// wired against Cognito below; that swap happens in a follow-up commit.
+builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
+builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 
 builder.Services.AddSignalR();
 
