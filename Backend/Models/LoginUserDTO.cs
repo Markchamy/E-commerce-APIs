@@ -13,6 +13,8 @@
         public string FirstName { get; set; } // Only for response
         public string LastName { get; set; }  // Only for response
         public string Role { get; set; } // Include role
+        public int StoreId { get; set; }
+        public string Token { get; set; }
         public EmployeeDetailsDTO? EmployeeDetails { get; set; }
     }
 

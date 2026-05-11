@@ -1,4 +1,5 @@
-﻿using Backend.Data;
+﻿using Backend.Auth;
+using Backend.Data;
 using Backend.Models;
 using Microsoft.AspNetCore.Mvc;
 using BCrypt.Net;
@@ -26,11 +27,13 @@ namespace Backend.Controllers
     {
         private readonly IUserServices _userRepository;
         private readonly IConfiguration _configuration;
+        private readonly IJwtTokenService _jwtTokenService;
 
-        public UsersController(IUserServices userRepository, IConfiguration configuration)
+        public UsersController(IUserServices userRepository, IConfiguration configuration, IJwtTokenService jwtTokenService)
         {
             _userRepository = userRepository;
             _configuration = configuration;
+            _jwtTokenService = jwtTokenService;
         }
 
         // API to register user
@@ -462,6 +465,18 @@ namespace Backend.Controllers
                     return Unauthorized("Invalid Password.");
                 }
 
+                // Resolve which store this user belongs to. Employees and customers
+                // each carry a StoreId; non-scoped users fall back to store 1 (Akiki).
+                int storeId = user.Employee?.StoreId ?? user.Customer?.StoreId ?? 1;
+
+                // Issue a local JWT. The store_id claim is read by TenantMiddleware
+                // on subsequent requests to populate ITenantContext.
+                string token = _jwtTokenService.CreateToken(
+                    userId: user.Id,
+                    email: user.email,
+                    role: user.role,
+                    storeId: storeId);
+
                 // Create response object
                 var userResponseDto = new LoginResponseDTO
                 {
@@ -469,7 +484,9 @@ namespace Backend.Controllers
                     Email = user.email,
                     FirstName = user.first_name,
                     LastName = user.last_name,
-                    Role = user.role
+                    Role = user.role,
+                    StoreId = storeId,
+                    Token = token
                 };
 
                 // If user is an employee, fetch access control
