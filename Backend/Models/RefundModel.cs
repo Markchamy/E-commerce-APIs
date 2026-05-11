@@ -1,14 +1,19 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
+using Backend.Interfaces;
 
 namespace Backend.Models
 {
-    public class RefundModel
+    public class RefundModel : IStoreScoped
     {
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public long id { get; set; }                 // int -> long
+
+        [Required]
+        [Column("store_id")]
+        public int StoreId { get; set; } = 1;
 
         public long orderid { get; set; }            // matches OrdersModel.orderid
         public DateTime created_at { get; set; }

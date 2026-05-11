@@ -1,12 +1,18 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Backend.Interfaces;
 
 namespace Backend.Models
 {
-    public class SupplierModel
+    public class SupplierModel : IStoreScoped
     {
         [Key]
         public int id { get; set; }
+
+        [Required]
+        [Column("store_id")]
+        public int StoreId { get; set; } = 1;
 
         public string company { get; set; }
         public string country { get; set; }

@@ -1,8 +1,16 @@
-﻿namespace Backend.Models
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Backend.Interfaces;
+
+namespace Backend.Models
 {
-    public class GiftCardModel
+    public class GiftCardModel : IStoreScoped
     {
         public int id { get; set; }
+
+        [Required]
+        [Column("store_id")]
+        public int StoreId { get; set; } = 1;
         public string balance { get; set; }
         public DateTime created_at { get; set; }
         public DateTime? updated_at { get; set; }

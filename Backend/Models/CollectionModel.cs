@@ -1,12 +1,18 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
+using Backend.Interfaces;
 
 namespace Backend.Models
 {
     [Table("smart_collections")]
-    public class CollectionModel
+    public class CollectionModel : IStoreScoped
     {
         public int Id { get; set; }
+
+        [Required]
+        [Column("store_id")]
+        public int StoreId { get; set; } = 1;
         public string handle { get; set; }
         public string title { get; set; }
         public DateTime updated_at { get; set; }

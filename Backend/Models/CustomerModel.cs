@@ -1,11 +1,17 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Numerics;
+using Backend.Interfaces;
 
 namespace Backend.Models
 {
-    public class CustomerModel
+    public class CustomerModel : IStoreScoped
     {
         public long Id { get; set; }
+
+        [Required]
+        [Column("store_id")]
+        public int StoreId { get; set; } = 1;
         public string? Company { get; set; }
         public string? Address { get; set; }
         public string? Apartment { get; set; }

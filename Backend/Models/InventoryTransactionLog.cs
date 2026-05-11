@@ -1,14 +1,19 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Backend.Interfaces;
 
 namespace Backend.Models
 {
     [Table("inventory_transaction_log")]
-    public class InventoryTransactionLog
+    public class InventoryTransactionLog : IStoreScoped
     {
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public long id { get; set; }
+
+        [Required]
+        [Column("store_id")]
+        public int StoreId { get; set; } = 1;
 
         public long variant_id { get; set; }
 

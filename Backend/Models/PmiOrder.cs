@@ -1,14 +1,19 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Backend.Interfaces;
 
 namespace Backend.Models
 {
     [Table("pmiorders")]
-    public class PmiOrder
+    public class PmiOrder : IStoreScoped
     {
         [Key]
         [Column("orderReference")]
         public string OrderReference { get; set; } = string.Empty;
+
+        [Required]
+        [Column("store_id")]
+        public int StoreId { get; set; } = 1;
 
         [Column("orderNumber")]
         public string? OrderNumber { get; set; }

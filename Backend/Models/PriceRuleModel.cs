@@ -1,11 +1,17 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Backend.Interfaces;
 
 namespace Backend.Models
 {
     [Table("price_rules")]
-    public class PriceRuleModel
+    public class PriceRuleModel : IStoreScoped
     {
         public int id { get; set; }
+
+        [Required]
+        [Column("store_id")]
+        public int StoreId { get; set; } = 1;
         public string value_type { get; set; }
         public string value { get; set; }
         public string customer_selection { get; set; }

@@ -1,4 +1,5 @@
-﻿using Backend.Models;
+﻿using Backend.Interfaces;
+using Backend.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Data
@@ -11,6 +12,7 @@ namespace Backend.Data
 
         public MyDbContext(DbContextOptions<MyDbContext> options) : base(options) { }
 
+        public DbSet<StoreModel> Stores { get; set; }
         public DbSet<UserModel> Users { get; set; }
         public DbSet<CustomerModel> Customers { get; set; }
         public DbSet<AddressesModel> Addresses { get; set; }
@@ -91,6 +93,12 @@ namespace Backend.Data
             base.OnModelCreating(modelBuilder);
 
             // Map entity names to lowercase table names (Linux is case-sensitive)
+            modelBuilder.Entity<StoreModel>(entity =>
+            {
+                entity.ToTable("stores");
+                entity.HasIndex(s => s.Slug).IsUnique().HasDatabaseName("UX_Stores_Slug");
+                entity.HasIndex(s => s.Domain).HasDatabaseName("IX_Stores_Domain");
+            });
             modelBuilder.Entity<UserModel>().ToTable("users");
             modelBuilder.Entity<CustomerModel>().ToTable("customers");
             modelBuilder.Entity<AddressesModel>().ToTable("addresses");
@@ -621,6 +629,42 @@ namespace Backend.Data
                     );
             });
 
+            // === Multi-tenancy: Store FK relationships ===
+            // Every IStoreScoped entity has a non-nullable StoreId referencing stores.Id.
+            // OnDelete=Restrict so a store can't be deleted while it owns data.
+            ConfigureStoreScope<CustomerModel>(modelBuilder, "IX_customers_store_id");
+            ConfigureStoreScope<EmployeeModel>(modelBuilder, "IX_employees_store_id");
+            ConfigureStoreScope<ProductModel>(modelBuilder, "IX_products_store_id");
+            ConfigureStoreScope<CollectionModel>(modelBuilder, "IX_smart_collections_store_id");
+            ConfigureStoreScope<OrdersModel>(modelBuilder, "IX_orders_store_id");
+            ConfigureStoreScope<RefundModel>(modelBuilder, "IX_refund_store_id");
+            ConfigureStoreScope<GiftCardModel>(modelBuilder, "IX_gift_card_store_id");
+            ConfigureStoreScope<DiscountModel>(modelBuilder, "IX_discount_code_store_id");
+            ConfigureStoreScope<PriceRuleModel>(modelBuilder, "IX_price_rules_store_id");
+            ConfigureStoreScope<CartItem>(modelBuilder, "IX_cart_store_id");
+            ConfigureStoreScope<BadgesModel>(modelBuilder, "IX_badges_store_id");
+            ConfigureStoreScope<CommentModel>(modelBuilder, "IX_comments_store_id");
+            ConfigureStoreScope<TimelineEventModel>(modelBuilder, "IX_timeline_events_store_id");
+            ConfigureStoreScope<VariantAdjustmentHistory>(modelBuilder, "IX_variant_adjustment_history_store_id");
+            ConfigureStoreScope<InventoryTransactionLog>(modelBuilder, "IX_inventory_transaction_log_store_id");
+            ConfigureStoreScope<SupplierModel>(modelBuilder, "IX_supplier_store_id");
+            ConfigureStoreScope<PmiCustomer>(modelBuilder, "IX_pmicustomers_store_id");
+            ConfigureStoreScope<PmiOrder>(modelBuilder, "IX_pmiorders_store_id");
+            ConfigureStoreScope<PmiProduct>(modelBuilder, "IX_pmiproducts_store_id");
+        }
+
+        private static void ConfigureStoreScope<TEntity>(ModelBuilder modelBuilder, string indexName)
+            where TEntity : class, IStoreScoped
+        {
+            modelBuilder.Entity<TEntity>()
+                .HasOne<StoreModel>()
+                .WithMany()
+                .HasForeignKey(e => e.StoreId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TEntity>()
+                .HasIndex(e => e.StoreId)
+                .HasDatabaseName(indexName);
         }
 
     }

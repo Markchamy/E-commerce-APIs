@@ -1,13 +1,18 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Backend.Interfaces;
 
 namespace Backend.Models
 {
-    public class OrdersModel
+    public class OrdersModel : IStoreScoped
     {
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.None)]   // Shopify order id
         public long orderid { get; set; }
+
+        [Required]
+        [Column("store_id")]
+        public int StoreId { get; set; } = 1;
 
         public long app_id { get; set; }
         public string browser_ip { get; set; }

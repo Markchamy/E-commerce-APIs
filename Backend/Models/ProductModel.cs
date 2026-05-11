@@ -1,11 +1,17 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using CsvHelper.Configuration.Attributes;
+using Backend.Interfaces;
 
 namespace Backend.Models
 {
-    public class ProductModel
+    public class ProductModel : IStoreScoped
     {
         public long Id { get; set; }
+
+        [Required]
+        [Column("store_id")]
+        public int StoreId { get; set; } = 1;
         public string? Title { get; set; }
         public string? body_html { get; set; }
         public string? Vendor { get; set; }
