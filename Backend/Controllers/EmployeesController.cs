@@ -55,11 +55,13 @@ namespace Backend.Controllers
 
         private bool CallerHasStoreAdminAccess()
         {
-            // Top-level role check (admin/manager); access_control is per-store
-            // and we're already auto-scoped to that store by the query filter,
-            // so the role claim is sufficient for the gate here.
+            // Per-store admin/manager keep their existing power. super_admin is
+            // also allowed because they need to add admins to other stores when
+            // editing a tenant from the platform-level Stores page (they send
+            // X-Store-Id explicitly, which the middleware accepts only for them).
             var role = User.FindFirst(ClaimTypes.Role)?.Value?.ToLowerInvariant();
-            return role != null && StoreAdminAccess.Contains(role);
+            if (role == null) return false;
+            return StoreAdminAccess.Contains(role) || role == "super_admin";
         }
 
         private static long GenerateUserId()

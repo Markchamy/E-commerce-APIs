@@ -131,13 +131,15 @@ namespace Backend.Controllers
             if (await _db.Stores.AnyAsync(s => s.Slug == dto.Slug))
                 return Conflict($"Slug '{dto.Slug}' is already in use.");
 
-            // Validate the bootstrap admin payload (if any) BEFORE we touch the DB.
-            if (dto.FirstAdmin != null)
+            // A store without an admin is unreachable — no one can log in.
+            // Require the FirstAdmin payload up front.
+            if (dto.FirstAdmin == null)
+                return BadRequest("FirstAdmin is required so the new store has at least one usable login.");
+            if (string.IsNullOrWhiteSpace(dto.FirstAdmin.Email))
+                return BadRequest("First admin email is required.");
+            if (string.IsNullOrWhiteSpace(dto.FirstAdmin.Password) || dto.FirstAdmin.Password.Length < 8)
+                return BadRequest("First admin password must be at least 8 characters.");
             {
-                if (string.IsNullOrWhiteSpace(dto.FirstAdmin.Email))
-                    return BadRequest("First admin email is required.");
-                if (string.IsNullOrWhiteSpace(dto.FirstAdmin.Password) || dto.FirstAdmin.Password.Length < 8)
-                    return BadRequest("First admin password must be at least 8 characters.");
                 var email = dto.FirstAdmin.Email.Trim().ToLowerInvariant();
                 if (await _db.Users.IgnoreQueryFilters().AnyAsync(u => u.email == email))
                     return Conflict($"Email '{email}' is already in use.");
@@ -162,31 +164,26 @@ namespace Backend.Controllers
                 _db.Stores.Add(store);
                 await _db.SaveChangesAsync();
 
-                long? createdUserId = null;
-                if (dto.FirstAdmin != null)
+                var newUser = new UserModel
                 {
-                    var newUser = new UserModel
-                    {
-                        Id = GenerateUserId(),
-                        role = "admin",
-                        email = dto.FirstAdmin.Email.Trim().ToLowerInvariant(),
-                        password = BCrypt.Net.BCrypt.HashPassword(dto.FirstAdmin.Password),
-                        first_name = dto.FirstAdmin.FirstName?.Trim(),
-                        last_name = dto.FirstAdmin.LastName?.Trim(),
-                        phone_number = dto.FirstAdmin.PhoneNumber?.Trim(),
-                    };
-                    _db.Users.Add(newUser);
-                    await _db.SaveChangesAsync();
+                    Id = GenerateUserId(),
+                    role = "admin",
+                    email = dto.FirstAdmin.Email.Trim().ToLowerInvariant(),
+                    password = BCrypt.Net.BCrypt.HashPassword(dto.FirstAdmin.Password),
+                    first_name = dto.FirstAdmin.FirstName?.Trim(),
+                    last_name = dto.FirstAdmin.LastName?.Trim(),
+                    phone_number = dto.FirstAdmin.PhoneNumber?.Trim(),
+                };
+                _db.Users.Add(newUser);
+                await _db.SaveChangesAsync();
 
-                    _db.Employees.Add(new EmployeeModel
-                    {
-                        StoreId = store.Id,
-                        UserId = newUser.Id,
-                        AccessControl = new List<string> { "admin" },
-                    });
-                    await _db.SaveChangesAsync();
-                    createdUserId = newUser.Id;
-                }
+                _db.Employees.Add(new EmployeeModel
+                {
+                    StoreId = store.Id,
+                    UserId = newUser.Id,
+                    AccessControl = new List<string> { "admin" },
+                });
+                await _db.SaveChangesAsync();
 
                 await tx.CommitAsync();
 
@@ -195,7 +192,7 @@ namespace Backend.Controllers
                     id = store.Id,
                     name = store.Name,
                     slug = store.Slug,
-                    firstAdminUserId = createdUserId,
+                    firstAdminUserId = newUser.Id,
                 });
             }
             catch
