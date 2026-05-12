@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using System.Security.AccessControl;
 using Backend.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 using System.Net;
 using System.Numerics;
@@ -26,12 +27,14 @@ namespace Backend.Controllers
         private readonly IUserServices _userRepository;
         private readonly IConfiguration _configuration;
         private readonly IJwtTokenService _jwtTokenService;
+        private readonly MyDbContext _db;
 
-        public UsersController(IUserServices userRepository, IConfiguration configuration, IJwtTokenService jwtTokenService)
+        public UsersController(IUserServices userRepository, IConfiguration configuration, IJwtTokenService jwtTokenService, MyDbContext db)
         {
             _userRepository = userRepository;
             _configuration = configuration;
             _jwtTokenService = jwtTokenService;
+            _db = db;
         }
 
         // API to register user
@@ -475,6 +478,16 @@ namespace Backend.Controllers
                     role: user.role,
                     storeId: storeId);
 
+                // Persist a refresh token (hash only) so the client can rotate.
+                var refresh = _jwtTokenService.CreateRefreshToken();
+                _db.RefreshTokens.Add(new RefreshTokenModel
+                {
+                    UserId = user.Id,
+                    TokenHash = refresh.Hash,
+                    ExpiresAt = DateTime.UtcNow.AddDays(30),
+                });
+                await _db.SaveChangesAsync();
+
                 // Create response object
                 var userResponseDto = new LoginResponseDTO
                 {
@@ -484,7 +497,8 @@ namespace Backend.Controllers
                     LastName = user.last_name,
                     Role = user.role,
                     StoreId = storeId,
-                    Token = token
+                    Token = token,
+                    RefreshToken = refresh.Token
                 };
 
                 // If user is an employee, fetch access control

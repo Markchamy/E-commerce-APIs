@@ -15,7 +15,20 @@
         public string Role { get; set; } // Include role
         public int StoreId { get; set; }
         public string Token { get; set; }
+        public string RefreshToken { get; set; }
         public EmployeeDetailsDTO? EmployeeDetails { get; set; }
+    }
+
+    public class RefreshTokenRequestDTO
+    {
+        public string RefreshToken { get; set; } = string.Empty;
+    }
+
+    public class RefreshTokenResponseDTO
+    {
+        public string Token { get; set; } = string.Empty;
+        public string RefreshToken { get; set; } = string.Empty;
+        public int StoreId { get; set; }
     }
 
 }

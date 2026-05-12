@@ -27,6 +27,7 @@ namespace Backend.Data
         public int? CurrentStoreId => _tenantContext?.StoreId;
 
         public DbSet<StoreModel> Stores { get; set; }
+        public DbSet<RefreshTokenModel> RefreshTokens { get; set; }
         public DbSet<UserModel> Users { get; set; }
         public DbSet<CustomerModel> Customers { get; set; }
         public DbSet<AddressesModel> Addresses { get; set; }
