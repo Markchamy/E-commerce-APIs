@@ -466,15 +466,27 @@ namespace Backend.Controllers
                     return Unauthorized("Invalid Password.");
                 }
 
-                // Resolve which store this user belongs to. super_admin is a
-                // platform-level role that operates outside any single store, so
-                // it gets storeId=0 (the JWT claim is then ignored by middleware
-                // and they must pick a store explicitly via X-Store-Id when
-                // needed). Everyone else inherits StoreId from their Employee
-                // or Customer record, falling back to 1 if neither exists.
-                int storeId = string.Equals(user.role, "super_admin", StringComparison.OrdinalIgnoreCase)
-                    ? 0
-                    : user.Employee?.StoreId ?? user.Customer?.StoreId ?? 1;
+                // super_admin is the only role that operates outside any store
+                // (storeId=0; the claim is ignored by middleware until they
+                // pick one via X-Store-Id). Every other role MUST be tied to a
+                // store via its Employee or Customer record — there is no
+                // implicit "default tenant" fallback. Reject the login if the
+                // user has no store assignment.
+                bool isSuperAdmin = string.Equals(user.role, "super_admin", StringComparison.OrdinalIgnoreCase);
+                int storeId;
+                if (isSuperAdmin)
+                {
+                    storeId = 0;
+                }
+                else
+                {
+                    var resolved = user.Employee?.StoreId ?? user.Customer?.StoreId;
+                    if (resolved is null || resolved <= 0)
+                    {
+                        return Unauthorized("This account is not associated with any store. Contact an administrator.");
+                    }
+                    storeId = resolved.Value;
+                }
 
                 // Issue a local JWT. The store_id claim is read by TenantMiddleware
                 // on subsequent requests to populate ITenantContext.

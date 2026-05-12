@@ -52,7 +52,23 @@ namespace Backend.Controllers
             if (user == null)
                 return Unauthorized("User no longer exists.");
 
-            int storeId = user.Employee?.StoreId ?? user.Customer?.StoreId ?? 1;
+            // Same rule as Login: super_admin gets storeId=0; everyone else
+            // must be tied to a store via Employee or Customer (no fallback).
+            bool isSuperAdmin = string.Equals(user.role, "super_admin", StringComparison.OrdinalIgnoreCase);
+            int storeId;
+            if (isSuperAdmin)
+            {
+                storeId = 0;
+            }
+            else
+            {
+                var resolved = user.Employee?.StoreId ?? user.Customer?.StoreId;
+                if (resolved is null || resolved <= 0)
+                {
+                    return Unauthorized("This account is not associated with any store.");
+                }
+                storeId = resolved.Value;
+            }
 
             // Rotate: revoke the presented token, mint a new pair.
             record.RevokedAt = DateTime.UtcNow;
