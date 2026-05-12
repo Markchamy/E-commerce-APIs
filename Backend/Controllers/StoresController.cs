@@ -84,9 +84,43 @@ namespace Backend.Controllers
             public string? Currency { get; set; }
             public string? Locale { get; set; }
             public bool IsActive { get; set; } = true;
+
+            /// <summary>
+            /// Optional bootstrap admin. When present on POST /stores, the
+            /// store + user + employee are created in a single transaction so
+            /// the new tenant has a usable login from day one. Ignored on PUT.
+            /// </summary>
+            public BootstrapAdminDTO? FirstAdmin { get; set; }
         }
 
-        /// <summary>Create a new tenant. Super-admin only.</summary>
+        public class BootstrapAdminDTO
+        {
+            public string Email { get; set; } = string.Empty;
+            public string Password { get; set; } = string.Empty;
+            public string FirstName { get; set; } = string.Empty;
+            public string LastName { get; set; } = string.Empty;
+            public string? PhoneNumber { get; set; }
+        }
+
+        /// <summary>
+        /// users.Id has no AUTO_INCREMENT in this schema, so the API has to
+        /// supply one. Mirror the timestamp+random pattern used in the CMS
+        /// signup page to stay collision-resistant.
+        /// </summary>
+        private static long GenerateUserId()
+        {
+            var timestamp = (long)(DateTime.UtcNow - DateTime.UnixEpoch).TotalMilliseconds;
+            var rand = Random.Shared.Next(0, 4096);
+            var id = (timestamp << 12) | (long)rand;
+            return id < 1_000_000 ? 1_000_000 + rand : id;
+        }
+
+        /// <summary>
+        /// Create a new tenant. Super-admin only. If FirstAdmin is supplied,
+        /// the new store, its first admin user, and the corresponding employees
+        /// row are written in one transaction — so a newly created tenant is
+        /// guaranteed to have at least one person who can log in.
+        /// </summary>
         [HttpPost("stores")]
         public async Task<IActionResult> Create([FromBody] StoreUpsertDTO dto)
         {
@@ -94,31 +128,81 @@ namespace Backend.Controllers
             if (string.IsNullOrWhiteSpace(dto.Name)) return BadRequest("Name is required.");
             if (string.IsNullOrWhiteSpace(dto.Slug)) return BadRequest("Slug is required.");
 
-            var slugTaken = await _db.Stores.AnyAsync(s => s.Slug == dto.Slug);
-            if (slugTaken) return Conflict($"Slug '{dto.Slug}' is already in use.");
+            if (await _db.Stores.AnyAsync(s => s.Slug == dto.Slug))
+                return Conflict($"Slug '{dto.Slug}' is already in use.");
 
-            var store = new StoreModel
+            // Validate the bootstrap admin payload (if any) BEFORE we touch the DB.
+            if (dto.FirstAdmin != null)
             {
-                Name = dto.Name.Trim(),
-                Slug = dto.Slug.Trim().ToLowerInvariant(),
-                Domain = string.IsNullOrWhiteSpace(dto.Domain) ? null : dto.Domain.Trim(),
-                LogoUrl = dto.LogoUrl,
-                PrimaryColor = dto.PrimaryColor,
-                Currency = dto.Currency,
-                Locale = dto.Locale,
-                IsActive = dto.IsActive,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow,
-            };
-            _db.Stores.Add(store);
-            await _db.SaveChangesAsync();
+                if (string.IsNullOrWhiteSpace(dto.FirstAdmin.Email))
+                    return BadRequest("First admin email is required.");
+                if (string.IsNullOrWhiteSpace(dto.FirstAdmin.Password) || dto.FirstAdmin.Password.Length < 8)
+                    return BadRequest("First admin password must be at least 8 characters.");
+                var email = dto.FirstAdmin.Email.Trim().ToLowerInvariant();
+                if (await _db.Users.IgnoreQueryFilters().AnyAsync(u => u.email == email))
+                    return Conflict($"Email '{email}' is already in use.");
+            }
 
-            return CreatedAtAction(nameof(GetAll), new { id = store.Id }, new
+            await using var tx = await _db.Database.BeginTransactionAsync();
+            try
             {
-                id = store.Id,
-                name = store.Name,
-                slug = store.Slug,
-            });
+                var store = new StoreModel
+                {
+                    Name = dto.Name.Trim(),
+                    Slug = dto.Slug.Trim().ToLowerInvariant(),
+                    Domain = string.IsNullOrWhiteSpace(dto.Domain) ? null : dto.Domain.Trim(),
+                    LogoUrl = dto.LogoUrl,
+                    PrimaryColor = dto.PrimaryColor,
+                    Currency = dto.Currency,
+                    Locale = dto.Locale,
+                    IsActive = dto.IsActive,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow,
+                };
+                _db.Stores.Add(store);
+                await _db.SaveChangesAsync();
+
+                long? createdUserId = null;
+                if (dto.FirstAdmin != null)
+                {
+                    var newUser = new UserModel
+                    {
+                        Id = GenerateUserId(),
+                        role = "admin",
+                        email = dto.FirstAdmin.Email.Trim().ToLowerInvariant(),
+                        password = BCrypt.Net.BCrypt.HashPassword(dto.FirstAdmin.Password),
+                        first_name = dto.FirstAdmin.FirstName?.Trim(),
+                        last_name = dto.FirstAdmin.LastName?.Trim(),
+                        phone_number = dto.FirstAdmin.PhoneNumber?.Trim(),
+                    };
+                    _db.Users.Add(newUser);
+                    await _db.SaveChangesAsync();
+
+                    _db.Employees.Add(new EmployeeModel
+                    {
+                        StoreId = store.Id,
+                        UserId = newUser.Id,
+                        AccessControl = new List<string> { "admin" },
+                    });
+                    await _db.SaveChangesAsync();
+                    createdUserId = newUser.Id;
+                }
+
+                await tx.CommitAsync();
+
+                return CreatedAtAction(nameof(GetAll), new { id = store.Id }, new
+                {
+                    id = store.Id,
+                    name = store.Name,
+                    slug = store.Slug,
+                    firstAdminUserId = createdUserId,
+                });
+            }
+            catch
+            {
+                await tx.RollbackAsync();
+                throw;
+            }
         }
 
         /// <summary>
