@@ -8,9 +8,10 @@ namespace Backend.Middleware
         public const string HeaderName = "X-Store-Id";
         public const string JwtClaimName = "store_id";
 
-        // Roles allowed to switch tenants via X-Store-Id. Anyone else is locked
-        // to whatever store_id their JWT was issued with.
-        private static readonly string[] SuperAdminRoles = { "admin", "manager" };
+        // Only the platform-level super_admin role can switch tenants via
+        // X-Store-Id. Per-store admins/managers/employees are pinned to their
+        // assigned store by the JWT store_id claim.
+        public const string SuperAdminRole = "super_admin";
 
         private readonly RequestDelegate _next;
 
@@ -38,8 +39,7 @@ namespace Backend.Middleware
 
             var role = user?.FindFirst(ClaimTypes.Role)?.Value;
             var isSuperAdmin = isAuthenticated
-                && role != null
-                && SuperAdminRoles.Any(r => string.Equals(r, role, StringComparison.OrdinalIgnoreCase));
+                && string.Equals(role, SuperAdminRole, StringComparison.OrdinalIgnoreCase);
 
             if (isSuperAdmin)
             {

@@ -466,9 +466,15 @@ namespace Backend.Controllers
                     return Unauthorized("Invalid Password.");
                 }
 
-                // Resolve which store this user belongs to. Employees and customers
-                // each carry a StoreId; non-scoped users fall back to store 1 (Akiki).
-                int storeId = user.Employee?.StoreId ?? user.Customer?.StoreId ?? 1;
+                // Resolve which store this user belongs to. super_admin is a
+                // platform-level role that operates outside any single store, so
+                // it gets storeId=0 (the JWT claim is then ignored by middleware
+                // and they must pick a store explicitly via X-Store-Id when
+                // needed). Everyone else inherits StoreId from their Employee
+                // or Customer record, falling back to 1 if neither exists.
+                int storeId = string.Equals(user.role, "super_admin", StringComparison.OrdinalIgnoreCase)
+                    ? 0
+                    : user.Employee?.StoreId ?? user.Customer?.StoreId ?? 1;
 
                 // Issue a local JWT. The store_id claim is read by TenantMiddleware
                 // on subsequent requests to populate ITenantContext.

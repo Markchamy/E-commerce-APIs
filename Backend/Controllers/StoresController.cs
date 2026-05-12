@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Backend.Data;
+using Backend.Middleware;
 using Backend.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,7 +13,7 @@ namespace Backend.Controllers
     [Authorize]
     public class StoresController : ControllerBase
     {
-        private static readonly string[] SuperAdminRoles = { "admin", "manager" };
+        private static readonly string[] StoreAdminRoles = { "admin", "manager" };
 
         private readonly MyDbContext _db;
 
@@ -21,11 +22,19 @@ namespace Backend.Controllers
             _db = db;
         }
 
-        private bool IsSuperAdmin()
+        private string? CurrentRole => User.FindFirst(ClaimTypes.Role)?.Value;
+
+        private bool IsSuperAdmin() =>
+            string.Equals(CurrentRole, TenantMiddleware.SuperAdminRole, StringComparison.OrdinalIgnoreCase);
+
+        private bool IsStoreAdmin() =>
+            CurrentRole != null && StoreAdminRoles.Any(r =>
+                string.Equals(r, CurrentRole, StringComparison.OrdinalIgnoreCase));
+
+        private int? CurrentJwtStoreId()
         {
-            var role = User.FindFirst(ClaimTypes.Role)?.Value;
-            return role != null && SuperAdminRoles.Any(r =>
-                string.Equals(r, role, StringComparison.OrdinalIgnoreCase));
+            var claim = User.FindFirst("store_id")?.Value;
+            return int.TryParse(claim, out var id) && id > 0 ? id : null;
         }
 
         /// <summary>
@@ -37,18 +46,14 @@ namespace Backend.Controllers
         [HttpGet("stores")]
         public async Task<IActionResult> GetAll()
         {
-            var isSuperAdmin = IsSuperAdmin();
-
             var query = _db.Stores.Where(s => s.IsActive);
 
-            if (!isSuperAdmin)
+            if (!IsSuperAdmin())
             {
-                var storeIdClaim = User.FindFirst("store_id")?.Value;
-                if (!int.TryParse(storeIdClaim, out var storeId) || storeId <= 0)
-                {
-                    return Ok(Array.Empty<object>());
-                }
-                query = query.Where(s => s.Id == storeId);
+                // Per-store roles (admin/manager/employee): see only your store.
+                var storeId = CurrentJwtStoreId();
+                if (storeId == null) return Ok(Array.Empty<object>());
+                query = query.Where(s => s.Id == storeId.Value);
             }
 
             var stores = await query
@@ -116,11 +121,18 @@ namespace Backend.Controllers
             });
         }
 
-        /// <summary>Update a tenant. Super-admin only.</summary>
+        /// <summary>
+        /// Update a tenant. Super-admin can update any store; a store-level admin
+        /// or manager can update only their own store.
+        /// </summary>
         [HttpPut("stores/{id:int}")]
         public async Task<IActionResult> Update(int id, [FromBody] StoreUpsertDTO dto)
         {
-            if (!IsSuperAdmin()) return Forbid();
+            if (!IsSuperAdmin())
+            {
+                if (!IsStoreAdmin()) return Forbid();
+                if (CurrentJwtStoreId() != id) return Forbid();
+            }
 
             var store = await _db.Stores.FirstOrDefaultAsync(s => s.Id == id);
             if (store == null) return NotFound();
