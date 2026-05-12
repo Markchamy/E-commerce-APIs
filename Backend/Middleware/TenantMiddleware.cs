@@ -43,9 +43,13 @@ namespace Backend.Middleware
 
             if (isSuperAdmin)
             {
-                // Header wins; JWT claim is a fallback default.
-                var resolved = headerStoreId ?? jwtStoreId;
-                if (resolved.HasValue) tenantContext.SetStore(resolved.Value);
+                // super_admin operates outside any tenant by default. They only
+                // gain access to a store's data when they explicitly opt in by
+                // sending X-Store-Id. Without it, mark the context as tenant-
+                // blind so every IStoreScoped query filter returns zero rows —
+                // super_admin's job is store lifecycle, not store contents.
+                if (headerStoreId.HasValue) tenantContext.SetStore(headerStoreId.Value);
+                else tenantContext.SetTenantBlind();
             }
             else if (isAuthenticated)
             {

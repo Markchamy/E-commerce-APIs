@@ -26,6 +26,13 @@ namespace Backend.Data
         /// </summary>
         public int? CurrentStoreId => _tenantContext?.StoreId;
 
+        /// <summary>
+        /// When true (super_admin without an explicit X-Store-Id), the query
+        /// filter on every IStoreScoped entity short-circuits to false — the
+        /// caller sees no rows. Stores and other global tables are unaffected.
+        /// </summary>
+        public bool IsTenantBlind => _tenantContext?.IsTenantBlind ?? false;
+
         public DbSet<StoreModel> Stores { get; set; }
         public DbSet<RefreshTokenModel> RefreshTokens { get; set; }
         public DbSet<UserModel> Users { get; set; }
@@ -682,10 +689,12 @@ namespace Backend.Data
                 .HasDatabaseName(indexName);
 
             // Auto-scope every read against this entity to the current tenant.
-            // CurrentStoreId == null disables the filter for unauthenticated routes
-            // and design-time tools, preserving legacy behavior where applicable.
+            // IsTenantBlind short-circuits to no rows (used for super_admin who
+            // hasn't picked a store). CurrentStoreId == null otherwise disables
+            // the filter for unauthenticated routes and design-time tools,
+            // preserving legacy behavior where applicable.
             modelBuilder.Entity<TEntity>()
-                .HasQueryFilter(e => CurrentStoreId == null || e.StoreId == CurrentStoreId);
+                .HasQueryFilter(e => !IsTenantBlind && (CurrentStoreId == null || e.StoreId == CurrentStoreId));
         }
 
         public override int SaveChanges() => SaveChanges(acceptAllChangesOnSuccess: true);
