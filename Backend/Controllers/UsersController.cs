@@ -519,12 +519,15 @@ namespace Backend.Controllers
                     RefreshToken = refresh.Token
                 };
 
-                // If user is an employee, fetch access control
-                if (user.role == "employee" && user.Employee != null)
+                // Surface AccessControl whenever there's an Employee record, not
+                // just for role=='employee'. The CMS uses these tags to gate the
+                // sidebar nav and restricted pages (Customers, Marketing, etc.),
+                // so admins and managers need them too.
+                if (user.Employee != null)
                 {
                     userResponseDto.EmployeeDetails = new EmployeeDetailsDTO
                     {
-                        AccessControl = user.Employee.AccessControl // Get from the JSON-mapped field
+                        AccessControl = user.Employee.AccessControl
                     };
                 }
 
